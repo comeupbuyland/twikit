@@ -165,6 +165,7 @@ class Client:
             elif status_code == 401:
                 raise Unauthorized(message, headers=response.headers)
             elif status_code == 403:
+                message = 'status: 403, message: "Forbidden"'
                 raise Forbidden(message, headers=response.headers)
             elif status_code == 404:
                 raise NotFound(message, headers=response.headers)
