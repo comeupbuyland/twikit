@@ -9,43 +9,45 @@ if TYPE_CHECKING:
 
     ClientType = Client | GuestClient
 
+from ..constants import DOMAIN
 
 class Endpoint:
-    GUEST_ACTIVATE = 'https://api.twitter.com/1.1/guest/activate.json'
-    ONBOARDING_SSO_INIT = 'https://api.x.com/1.1/onboarding/sso_init.json'
-    ACCOUNT_LOGOUT = 'https://api.twitter.com/1.1/account/logout.json'
-    ONBOARDING_TASK = 'https://api.twitter.com/1.1/onboarding/task.json'
-    SETTINGS = 'https://api.twitter.com/1.1/account/settings.json'
-    UPLOAD_MEDIA = 'https://upload.twitter.com/i/media/upload.json'
-    UPLOAD_MEDIA_2 = 'https://upload.twitter.com/i/media/upload2.json'
-    CREATE_MEDIA_METADATA = 'https://api.twitter.com/1.1/media/metadata/create.json'
-    CREATE_CARD = 'https://caps.twitter.com/v2/cards/create.json'
-    VOTE = 'https://caps.twitter.com/v2/capi/passthrough/1'
-    REVERSE_GEOCODE = 'https://api.twitter.com/1.1/geo/reverse_geocode.json'
-    SEARCH_GEO = 'https://api.twitter.com/1.1/geo/search.json'
-    GET_PLACE = 'https://api.twitter.com/1.1/geo/id/{}.json'
-    CREATE_FRIENDSHIPS = 'https://twitter.com/i/api/1.1/friendships/create.json'
-    DESTROY_FRIENDSHIPS = 'https://twitter.com/i/api/1.1/friendships/destroy.json'
-    CREATE_BLOCKS = 'https://twitter.com/i/api/1.1/blocks/create.json'
-    DESTROY_BLOCKS = 'https://twitter.com/i/api/1.1/blocks/destroy.json'
-    CREATE_MUTES = 'https://twitter.com/i/api/1.1/mutes/users/create.json'
-    DESTROY_MUTES = 'https://twitter.com/i/api/1.1/mutes/users/destroy.json'
-    GUIDE = 'https://twitter.com/i/api/2/guide.json'
-    AVAILABLE_TRENDS = 'https://api.twitter.com/1.1/trends/available.json'
-    PLACE_TRENDS = 'https://api.twitter.com/1.1/trends/place.json'
-    FOLLOWERS_LIST = 'https://api.twitter.com/1.1/followers/list.json'
-    FRIENDS_LIST = 'https://api.twitter.com/1.1/friends/list.json'
-    FOLLOWERS_IDS = 'https://api.twitter.com/1.1/followers/ids.json'
-    FRIENDS_IDS = 'https://api.twitter.com/1.1/friends/ids.json'
-    DM_NEW = 'https://twitter.com/i/api/1.1/dm/new2.json'
-    DM_CONVERSATION = 'https://twitter.com/i/api/1.1/dm/conversation/{}.json'
-    CONVERSATION_UPDATE_NAME = 'https://twitter.com/i/api/1.1/dm/conversation/{}/update_name.json'
-    NOTIFICATIONS_ALL = 'https://twitter.com/i/api/2/notifications/all.json'
-    NOTIFICATIONS_VERIFIED = 'https://twitter.com/i/api/2/notifications/verified.json'
-    NOTIFICATIONS_MENTIONS = 'https://twitter.com/i/api/2/notifications/mentions.json'
-    LIVE_PIPELINE_EVENTS = 'https://api.twitter.com/live_pipeline/events'
-    LIVE_PIPELINE_UPDATE_SUBSCRIPTIONS = 'https://api.twitter.com/1.1/live_pipeline/update_subscriptions'
-    USER_STATE = 'https://api.twitter.com/help-center/forms/api/prod/user_state.json'
+    GUEST_ACTIVATE = f'https://api.{DOMAIN}/1.1/guest/activate.json'
+    ONBOARDING_SSO_INIT = f'https://api.{DOMAIN}/1.1/onboarding/sso_init.json'
+    ACCOUNT_LOGOUT = f'https://api.{DOMAIN}/1.1/account/logout.json'
+    ONBOARDING_TASK = f'https://api.{DOMAIN}/1.1/onboarding/task.json'
+    SETTINGS = f'https://api.{DOMAIN}/1.1/account/settings.json'
+    UPLOAD_MEDIA = f'https://upload.{DOMAIN}/i/media/upload.json'
+    UPLOAD_MEDIA_2 = f'https://upload.{DOMAIN}/i/media/upload2.json'
+    CREATE_MEDIA_METADATA = f'https://api.{DOMAIN}/1.1/media/metadata/create.json'
+    CREATE_CARD = f'https://caps.{DOMAIN}/v2/cards/create.json'
+    VOTE = f'https://caps.{DOMAIN}/v2/capi/passthrough/1'
+    REVERSE_GEOCODE = f'https://api.{DOMAIN}/1.1/geo/reverse_geocode.json'
+    SEARCH_GEO = f'https://api.{DOMAIN}/1.1/geo/search.json'
+    GET_PLACE = f'https://api.{DOMAIN}/1.1/geo/id/{{}}.json'
+    CREATE_FRIENDSHIPS = f'https://{DOMAIN}/i/api/1.1/friendships/create.json'
+    DESTROY_FRIENDSHIPS = f'https://{DOMAIN}/i/api/1.1/friendships/destroy.json'
+    CREATE_BLOCKS = f'https://{DOMAIN}/i/api/1.1/blocks/create.json'
+    DESTROY_BLOCKS = f'https://{DOMAIN}/i/api/1.1/blocks/destroy.json'
+    CREATE_MUTES = f'https://{DOMAIN}/i/api/1.1/mutes/users/create.json'
+    DESTROY_MUTES = f'https://{DOMAIN}/i/api/1.1/mutes/users/destroy.json'
+    GUIDE = f'https://{DOMAIN}/i/api/2/guide.json'
+    AVAILABLE_TRENDS = f'https://api.{DOMAIN}/1.1/trends/available.json'
+    PLACE_TRENDS = f'https://api.{DOMAIN}/1.1/trends/place.json'
+    FOLLOWERS_LIST = f'https://api.{DOMAIN}/1.1/followers/list.json'
+    FRIENDS_LIST = f'https://api.{DOMAIN}/1.1/friends/list.json'
+    FOLLOWERS_IDS = f'https://api.{DOMAIN}/1.1/followers/ids.json'
+    FRIENDS_IDS = f'https://api.{DOMAIN}/1.1/friends/ids.json'
+    DM_NEW = f'https://{DOMAIN}/i/api/1.1/dm/new2.json'
+    DM_INBOX = f'https://{DOMAIN}/i/api/1.1/dm/inbox_initial_state.json'
+    DM_CONVERSATION = f'https://{DOMAIN}/i/api/1.1/dm/conversation/{{}}.json'
+    CONVERSATION_UPDATE_NAME = f'https://{DOMAIN}/i/api/1.1/dm/conversation/{{}}/update_name.json'
+    NOTIFICATIONS_ALL = f'https://{DOMAIN}/i/api/2/notifications/all.json'
+    NOTIFICATIONS_VERIFIED = f'https://{DOMAIN}/i/api/2/notifications/verified.json'
+    NOTIFICATIONS_MENTIONS = f'https://{DOMAIN}/i/api/2/notifications/mentions.json'
+    LIVE_PIPELINE_EVENTS = f'https://api.{DOMAIN}/live_pipeline/events'
+    LIVE_PIPELINE_UPDATE_SUBSCRIPTIONS = f'https://api.{DOMAIN}/1.1/live_pipeline/update_subscriptions'
+    USER_STATE = f'https://api.{DOMAIN}/help-center/forms/api/prod/user_state.json'
 
 
 class V11Client:
@@ -76,11 +78,14 @@ class V11Client:
         if subtask_inputs is not None:
             data['subtask_inputs'] = subtask_inputs
 
-        headers = self.base._base_headers | {
-            'x-guest-token': guest_token
+        headers = {
+            'x-guest-token': guest_token,
+            'Authorization': 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA'
         }
-        headers.pop('X-Twitter-Active-User')
-        headers.pop('X-Twitter-Auth-Type')
+
+        if self.base._get_csrf_token():
+            headers["x-csrf-token"] = self.base._get_csrf_token()
+            headers["x-twitter-auth-type"] = "OAuth2Session"
 
         return await self.base.post(
             Endpoint.ONBOARDING_TASK,
@@ -386,7 +391,7 @@ class V11Client:
         params = {'count': count}
         if user_id is not None:
             params['user_id'] = user_id
-        elif user_id is not None:
+        elif screen_name is not None:
             params['screen_name'] = screen_name
 
         if cursor is not None:

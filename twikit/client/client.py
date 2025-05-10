@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import io
 import json
-import re
+import os
+
 import warnings
 from functools import partial
 from typing import Any, AsyncGenerator, Literal
+from urllib.parse import urlparse
 
 import filetype
 import pyotp
@@ -16,7 +18,7 @@ from httpx._utils import URLPattern
 from .._captcha import Capsolver
 from ..bookmark import BookmarkFolder
 from ..community import Community, CommunityMember
-from ..constants import TOKEN
+from ..constants import TOKEN, DOMAIN
 from ..errors import (
     AccountLocked,
     AccountSuspended,
@@ -43,6 +45,7 @@ from ..notification import Notification
 from ..streaming import Payload, StreamingSession, _payload_from_data
 from ..trend import Location, PlaceTrend, PlaceTrends, Trend
 from ..tweet import CommunityNote, Poll, ScheduledTweet, Tweet, tweet_from_data
+from ..ui_metrics import solve_ui_metrics
 from ..user import User
 from ..utils import (
     Flow,
@@ -53,6 +56,8 @@ from ..utils import (
     find_entry_by_type,
     httpx_transport_to_url
 )
+from ..x_client_transaction.utils import handle_x_migration
+from ..x_client_transaction import ClientTransaction
 from .gql import GQLClient
 from .v11 import V11Client
 
@@ -86,7 +91,7 @@ class Client:
 
     def __init__(
         self,
-        language: str | None = None,
+        language: str = 'en-US',
         proxy: str | None = None,
         captcha_solver: Capsolver | None = None,
         user_agent: str | None = None,
@@ -105,6 +110,7 @@ class Client:
         self.captcha_solver = captcha_solver
         if captcha_solver is not None:
             captcha_solver.client = self
+        self.client_transaction = ClientTransaction()
 
         self._token = TOKEN
         self._user_id = None
@@ -123,8 +129,24 @@ class Client:
         **kwargs
     ) -> tuple[dict | Any, Response]:
         ':meta private:'
+        headers = kwargs.pop('headers', {})
+
+        if not self.client_transaction.home_page_response:
+            cookies_backup = self.get_cookies().copy()
+            ct_headers = {
+                'Accept-Language': f'{self.language},{self.language.split("-")[0]};q=0.9',
+                'Cache-Control': 'no-cache',
+                'Referer': f'https://{DOMAIN}',
+                'User-Agent': self._user_agent
+            }
+            await self.client_transaction.init(self.http, ct_headers)
+            self.set_cookies(cookies_backup, clear_cookies=True)
+
+        tid = self.client_transaction.generate_transaction_id(method=method, path=urlparse(url).path)
+        headers['X-Client-Transaction-Id'] = tid
+
         cookies_backup = self.get_cookies().copy()
-        response = await self.http.request(method, url, **kwargs)
+        response = await self.http.request(method, url, headers=headers, **kwargs)
         self._remove_duplicate_ct0_cookie()
 
         try:
@@ -144,7 +166,7 @@ class Client:
                 if self.captcha_solver is None:
                     raise AccountLocked(
                         'Your account is locked. Visit '
-                        'https://twitter.com/account/access to unlock it.'
+                        f'https://{DOMAIN}/account/access to unlock it.'
                     )
                 if auto_unlock:
                     await self.unlock()
@@ -165,7 +187,6 @@ class Client:
             elif status_code == 401:
                 raise Unauthorized(message, headers=response.headers)
             elif status_code == 403:
-                message = 'status: 403, message: "Forbidden"'
                 raise Forbidden(message, headers=response.headers)
             elif status_code == 404:
                 raise NotFound(message, headers=response.headers)
@@ -179,6 +200,9 @@ class Client:
                 raise ServerError(message, headers=response.headers)
             else:
                 raise TwitterException(message, headers=response.headers)
+
+        if status_code == 200:
+            return response_data, response
 
         return response_data, response
 
@@ -234,7 +258,7 @@ class Client:
             'content-type': 'application/json',
             'X-Twitter-Auth-Type': 'OAuth2Session',
             'X-Twitter-Active-User': 'yes',
-            'Referer': 'https://twitter.com/',
+            'Referer': f'https://{DOMAIN}/',
             'User-Agent': self._user_agent,
         }
 
@@ -254,9 +278,9 @@ class Client:
         guest_token = response['guest_token']
         return guest_token
 
-    async def _ui_metrix(self) -> str:
-        js, _ = await self.get('https://twitter.com/i/js_inst?c_name=ui_metrics')
-        return re.findall(r'return ({.*?});', js, re.DOTALL)[0]
+    async def _ui_metrics(self) -> str:
+        response, _ = await self.get(f'https://twitter.com/i/js_inst?c_name=ui_metrics') # keep twitter.com here
+        return response
 
     async def login(
         self,
@@ -264,7 +288,9 @@ class Client:
         auth_info_1: str,
         auth_info_2: str | None = None,
         password: str,
-        totp_secret: str | None = None
+        totp_secret: str | None = None,
+        cookies_file: str | None = None,
+        enable_ui_metrics: bool = True
     ) -> dict:
         """
         Logs into the account using the specified login information.
@@ -285,9 +311,16 @@ class Client:
             It can be a username, email address, or phone number.
         password : :class:`str`
             The password associated with the account.
-        totp_secret : :class:`str`
+        totp_secret : :class:`str`, default=None
             The TOTP (Time-Based One-Time Password) secret key used for
             two-factor authentication (2FA).
+        cookies_file : :class:`str`, default=None
+            The file path used for storing and loading cookies.
+            If the specified file exists, cookies will be loaded from it, potentially bypassing the login process.
+            After a successful login, cookies will be saved to this file for future use.
+        enable_ui_metrics : :class:`bool`, default=True
+            If set to True, obfuscated ui_metrics function will be executed using js2py,
+            and the result will be sent to the API. Enabling this may reduce the risk of account suspension.
 
         Examples
         --------
@@ -298,6 +331,11 @@ class Client:
         ... )
         """
         self.http.cookies.clear()
+
+        if cookies_file and os.path.exists(cookies_file):
+            self.load_cookies(cookies_file)
+            return
+
         guest_token = await self._get_guest_token()
 
         flow = Flow(self, guest_token)
@@ -356,11 +394,19 @@ class Client:
             }
         })
         await flow.sso_init('apple')
+
+        if enable_ui_metrics:
+            ui_metrics_response = solve_ui_metrics(
+                await self._ui_metrics()
+            )
+        else:
+            ui_metrics_response = ''
+
         await flow.execute_task({
-            "subtask_id": "LoginJsInstrumentationSubtask",
-            "js_instrumentation": {
-                "response": await self._ui_metrix(),
-                "link": "next_link"
+            'subtask_id': 'LoginJsInstrumentationSubtask',
+            'js_instrumentation': {
+                'response': ui_metrics_response,
+                'link': 'next_link'
             }
         })
         await flow.execute_task({
@@ -387,6 +433,9 @@ class Client:
                 }
             })
 
+        if flow.task_id == 'DenyLoginSubtask':
+            raise TwitterException(flow.response['subtasks'][0]['cta']['secondary_text']['text'])
+
         await flow.execute_task({
             'subtask_id': 'LoginEnterPassword',
             'enter_password': {
@@ -398,10 +447,17 @@ class Client:
         if flow.task_id == 'DenyLoginSubtask':
             raise TwitterException(flow.response['subtasks'][0]['cta']['secondary_text']['text'])
 
-        if not flow.response['subtasks']:
-            return
+        if flow.task_id == 'LoginAcid':
+            print(find_dict(flow.response, 'secondary_text', find_one=True)[0]['text'])
 
-        self._user_id = find_dict(flow.response, 'id_str', find_one=True)[0]
+            await flow.execute_task({
+                'subtask_id': 'LoginAcid',
+                'enter_text': {
+                    'text': input('>>> '),
+                    'link': 'next_link'
+                }
+            })
+            return flow.response
 
         if flow.task_id == 'LoginTwoFactorAuthChallenge':
             if totp_secret is None:
@@ -418,17 +474,20 @@ class Client:
                 }
             })
 
-        if flow.task_id == 'LoginAcid':
-            print(find_dict(flow.response, 'secondary_text', find_one=True)[0]['text'])
+        await flow.execute_task({
+            'subtask_id': 'AccountDuplicationCheck',
+            'check_logged_in_account': {
+                'link': 'AccountDuplicationCheck_false'
+            }
+        })
 
-            await flow.execute_task({
-                'subtask_id': 'LoginAcid',
-                'enter_text': {
-                    'text': input('>>> '),
-                    'link': 'next_link'
-                }
-            })
+        if cookies_file:
+            self.save_cookies(cookies_file)
 
+        if not flow.response['subtasks']:
+            return
+
+        self._user_id = find_dict(flow.response, 'id_str', find_one=True)[0]
         return flow.response
 
     async def logout(self) -> Response:
@@ -701,7 +760,11 @@ class Client:
             if not item['entryId'].startswith(('tweet', 'search-grid')):
                 continue
 
-            tweet = tweet_from_data(self, item)
+            try:
+                tweet = tweet_from_data(self, item)
+            except KeyError:
+                tweet = None
+                
             if tweet is not None:
                 results.append(tweet)
 
@@ -1232,15 +1295,15 @@ class Client:
             reply_to, attachment_url, community_id, share_with_followers,
             richtext_options, edit_tweet_id, limit_mode
         )
-        if is_note_tweet:
-            _result = response['data']['notetweet_create']['tweet_results']
-        else:
-            _result = response['data']['create_tweet']['tweet_results']
-        if not _result:
+        if 'errors' in response:
             raise_exceptions_from_response(response['errors'])
             raise CouldNotTweet(
                 response['errors'][0] if response['errors'] else 'Failed to post a tweet.'
             )
+        if is_note_tweet:
+            _result = response['data']['notetweet_create']['tweet_results']
+        else:
+            _result = response['data']['create_tweet']['tweet_results']
         return tweet_from_data(self, _result)
 
     async def create_scheduled_tweet(
@@ -1585,6 +1648,34 @@ class Client:
         tweet.related_tweets = related_tweets
 
         return tweet
+
+    async def get_tweets_by_ids(self, ids: list[str]) -> list[Tweet]:
+        """
+        Retrieve multiple tweets by IDs.
+
+        Parameters
+        ----------
+        ids : list[:class:`str`]
+            A list of tweet IDs to retrieve.
+
+        Returns
+        -------
+        list[:class:`Tweet`]
+            List of tweets.
+
+        Examples
+        --------
+        >>> tweet_ids = ['1111111111', '1111111112', '111111113']
+        >>> tweets = await client.get_tweets_by_ids(tweet_ids)
+        >>> print(tweets)
+        [<Tweet id="1111111111">, <Tweet id="1111111112">, <Tweet id="111111113">]
+        """
+        response, _ = await self.gql.tweet_results_by_rest_ids(ids)
+        tweet_results = response['data']['tweetResult']
+        results = []
+        for tweet_result in tweet_results:
+            results.append(tweet_from_data(self, tweet_result))
+        return results
 
     async def get_scheduled_tweets(self) -> list[ScheduledTweet]:
         """
@@ -3033,10 +3124,10 @@ class Client:
             f'{user_id}-{await self.user_id()}', max_id
         )
 
-        items = response['conversation_timeline']['entries']
         if 'entries' not in response['conversation_timeline']:
             return Result([])
-
+        items = response['conversation_timeline']['entries']
+        
         messages = []
         for item in items:
             message_info = item['message']['message_data']
@@ -4119,7 +4210,7 @@ class Client:
         )
 
     async def _stream(self, topics: set[str]) -> AsyncGenerator[tuple[str, Payload]]:
-        url = 'https://api.twitter.com/live_pipeline/events'
+        url = f'https://api.{DOMAIN}/live_pipeline/events'
         params = {'topics': ','.join(topics)}
         headers = self._base_headers
         headers.pop('content-type')

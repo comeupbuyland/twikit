@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..constants import (
+    DOMAIN,
     BOOKMARK_FOLDER_TIMELINE_FEATURES,
     COMMUNITY_NOTE_FEATURES,
     COMMUNITY_TWEETS_FEATURES,
@@ -12,6 +13,7 @@ from ..constants import (
     NOTE_TWEET_FEATURES,
     SIMILAR_POSTS_FEATURES,
     TWEET_RESULT_BY_REST_ID_FEATURES,
+    TWEET_RESULTS_BY_REST_IDS_FEATURES,
     USER_FEATURES,
     USER_HIGHLIGHTS_TWEETS_FEATURES
 )
@@ -27,7 +29,7 @@ if TYPE_CHECKING:
 class Endpoint:
     @staticmethod
     def url(path):
-        return 'https://x.com/i/api/graphql/' + path
+        return f'https://{DOMAIN}/i/api/graphql/{path}'
 
     SEARCH_TIMELINE = url('flaR-PUMshxFWZWPNpq4zA/SearchTimeline')
     SIMILAR_POSTS = url('EToazR74i0rJyZYalfVEAQ/SimilarPosts')
@@ -96,6 +98,7 @@ class Endpoint:
     MEMBERS_SLICE_TIMELINE_QUERY = url('KDAssJ5lafCy-asH4wm1dw/membersSliceTimeline_Query')
     MODERATORS_SLICE_TIMELINE_QUERY = url('9KI_r8e-tgp3--N5SZYVjg/moderatorsSliceTimeline_Query')
     COMMUNITY_TWEET_SEARCH_MODULE_QUERY = url('5341rmzzvdjqfmPKfoHUBw/CommunityTweetSearchModuleQuery')
+    TWEET_RESULTS_BY_REST_IDS = url('PTN9HhBAlpoCTHfspDgqLA/TweetResultsByRestIds')
 
 
 class GQLClient:
@@ -668,6 +671,16 @@ class GQLClient:
         if cursor is not None:
             variables['cursor'] = cursor
         return await self.gql_get(Endpoint.COMMUNITY_TWEET_SEARCH_MODULE_QUERY, variables, COMMUNITY_TWEETS_FEATURES)
+
+    async def tweet_results_by_rest_ids(self, tweet_ids):
+        variables = {
+            'tweetIds': tweet_ids,
+            'includePromotedContent': True,
+            'withBirdwatchNotes': True,
+            'withVoice': True,
+            'withCommunity': True
+        }
+        return await self.gql_get(Endpoint.TWEET_RESULTS_BY_REST_IDS, variables, TWEET_RESULTS_BY_REST_IDS_FEATURES)
 
     ####################
     # For guest client

@@ -16,7 +16,10 @@ setup(
         'filetype',
         'beautifulsoup4',
         'pyotp',
-        'lxml'
+        'lxml',
+        'webvtt-py',
+        'm3u8',
+        'Js2Py-3.13'
     ],
     python_requires='>=3.8',
     description='Twitter API wrapper for python with **no API key required**.',
